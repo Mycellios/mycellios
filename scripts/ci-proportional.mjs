@@ -43,6 +43,9 @@ const stageSeedPython = new Set(['python/distributed_runtime/stage_artifact_cach
   'python/tests/test_stage_artifact_cache.py', 'python/tests/test_stage_seed_source.py']);
 const stageSeedTests = ['test_stage_seed_source.py', 'test_stage_artifact_cache.py'];
 const pageBrowserFile = file => /^src\/agent\/infra\/sandboxes\/computer\/(?:[^/]+-page-browser|test_page_browser\.py)$/.test(file);
+// The Agent production image's inputs: its Dockerfile and helpers, contexts' ignore files, lockfiles
+// and the server bundler. Changing one builds the image (never pushed) and boots it.
+export const agentImageInputs = files => files.some(f => /^(?:\.dockerignore|package-lock\.json|src\/agent\/(?:\.dockerignore|package-lock\.json|scripts\/build-server\.mjs|infra\/compose\/(?:Dockerfile|image-manifests\.mjs|check-runtime-externals\.mjs|check-image-boot\.sh|check-image\.sh|check-image-archive\.py)))$/.test(f));
 export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f) && !memoryEmbeddingPython.has(f) && !speculationPython.has(f) && !llamaCppPython.has(f) && !kokoroPython.has(f) && !linkProbePython.has(f) && !speechServicePython.has(f) && !stageSeedPython.has(f) && !pageBrowserFile(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
@@ -81,6 +84,8 @@ export function planChecks(files, availableAgentTests) {
   add('.', 'node', ['scripts/verify-private-terms.mjs'], 'private terms');
   // Nucleus skips the pre-deploy database copy unless these paths change; DDL elsewhere would bypass it.
   add('.', 'node', ['scripts/verify-ddl-locations.mjs'], 'coordinator schema only in declared paths');
+  // Before the workspace installs, while the runner still has the disk for a full image build.
+  if (agentImageInputs(files)) add('.', 'bash', ['src/agent/infra/compose/check-image-boot.sh'], 'Agent image build, layer sizes and boot (migrations, API, worker, web)');
   if (files.some(pageBrowserFile)) {
     add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'src/agent/infra/sandboxes/computer', '-p', 'test_page_browser.py'], 'conversation browser tab protocol');
   }

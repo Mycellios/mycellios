@@ -86,6 +86,12 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # The Agent Dockerfile keeps its dependency layers apart from the source, so a code-only
+          # commit should only replace its last layers. Hosted runners start empty, so the layer
+          # cache lives in the registry beside the image: without it every build would produce new
+          # dependency layers and Nucleus would pull them all again.
+          cache-from: ${{ matrix.image == 'agent' && format('type=registry,ref={0}:buildcache', steps.name.outputs.repository) || '' }}
+          cache-to: ${{ matrix.image == 'agent' && format('type=registry,ref={0}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.name.outputs.repository) || '' }}
 
   request-deployment:
     name: Request Nucleus deployment

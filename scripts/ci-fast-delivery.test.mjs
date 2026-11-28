@@ -189,6 +189,22 @@ test('each event uses its actual comparison revision', () => {
   assert.equal(eventBase('workflow_dispatch', {}, b, () => a), a);
   assert.throws(() => eventBase('push', { before: 'invalid' }, b, never), /Invalid/);
 });
+test('Agent image inputs build and boot the image once before the workspace installs', () => {
+  const boot = c => c.bin === 'bash' && c.args.includes('src/agent/infra/compose/check-image-boot.sh');
+  for (const file of ['src/agent/infra/compose/Dockerfile', '.dockerignore', 'src/agent/.dockerignore', 'package-lock.json', 'src/agent/package-lock.json', 'src/agent/infra/compose/image-manifests.mjs']) {
+    const plan = planChecks([file], []);
+    assert.equal(plan.filter(boot).length, 1, file);
+    const install = plan.findIndex(c => c.args.includes('ci'));
+    assert.ok(install === -1 || plan.findIndex(boot) < install, file);
+  }
+  for (const file of ['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/api/package.json', 'src/agent/infra/compose/docker-compose.yml', 'docs/DEVELOPMENT.md'])
+    assert.ok(!planChecks([file], []).some(boot), file);
+  // Building the image is read-only: CI never logs in to or pushes to a registry.
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  assert.doesNotMatch(workflow, /docker\/login-action|packages: write|self-hosted/);
+  assert.doesNotMatch(readFileSync('src/agent/infra/compose/check-image-boot.sh', 'utf8'), /docker (?:push|login)|--push/);
+});
+
 test('workflow validates merge candidates read-only and preserves evidence', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   assert.match(workflow, /pull_request:/);
