@@ -16732,3 +16732,15 @@ msgstr "{0} · unas {1} palabras por segundo, medido en este PC"
 #: src/pages/model-settings/local-models-settings.tsx
 msgid "Free memory"
 msgstr "Liberar memoria"
+
+#: src/components/SmallContextMark.tsx
+msgid "Micos need about 32k tokens of context, so this model may not work well."
+msgstr "Los Micos necesitan unos 32k tokens de contexto, así que este modelo puede no funcionar bien."
+
+#: src/components/SmallContextMark.tsx
+msgid "Small context"
+msgstr "Poco contexto"
+
+#: src/components/SmallContextMark.tsx
+msgid "Small context: Micos need about 32k tokens of context, so this model may not work well."
+msgstr "Poco contexto: los Micos necesitan unos 32k tokens de contexto, así que este modelo puede no funcionar bien."

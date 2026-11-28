@@ -213,6 +213,32 @@ describe("connected model choices", () => {
     ]);
   });
 
+  it("carries a catalog model's reported context window and leaves unknown ones unset", () => {
+    const catalog = [
+      { provider: "openrouter", id: "small", label: "Small", contextWindow: 8_192 },
+      { provider: "openrouter", id: "roomy", label: "Roomy", contextWindow: 200_000 },
+      { provider: "openrouter", id: "unknown", label: "Unknown" },
+      { provider: "other", id: "custom", label: "Other provider", contextWindow: 4_096 },
+    ];
+    const choices = connectedModelChoices(
+      [{ provider: "openrouter", label: "OpenRouter" }],
+      catalog,
+    );
+    expect(choices.map((choice) => choice.contextWindow)).toEqual([8_192, 200_000, undefined]);
+    expect(choices[2]).not.toHaveProperty("contextWindow");
+    const enabled = connectedModelChoices(
+      [
+        {
+          provider: "openrouter",
+          label: "OpenRouter",
+          enabledModelIds: ["small", "unknown", "typed-by-hand"],
+        },
+      ],
+      catalog,
+    );
+    expect(enabled.map((choice) => choice.contextWindow)).toEqual([8_192, undefined, undefined]);
+  });
+
   it("rewrites a catalog id that is only a display label", () => {
     const choices = connectedModelChoices(
       [{ provider: "deepseek", label: "DeepSeek", modelId: "deepseek-flash" }],

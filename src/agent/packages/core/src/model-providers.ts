@@ -135,6 +135,8 @@ export type ConnectedModelChoice = {
   images?: boolean;
   /** `new` for a recent release; `older` folds under Older models. */
   listing?: "new" | "older";
+  /** Context window in tokens when the catalog reports it; unknown otherwise. */
+  contextWindow?: number;
 };
 
 type CatalogModelRef = {
@@ -146,6 +148,7 @@ type CatalogModelRef = {
   placeholder?: boolean;
   images?: boolean;
   listing?: "new" | "older";
+  contextWindow?: number;
 };
 
 type CredentialModelRef = {
@@ -238,6 +241,7 @@ function catalogChoices(providerModels: readonly CatalogModelRef[]): ConnectedMo
       modelLabel: entry.label,
       images: entry.images,
       ...(entry.listing ? { listing: entry.listing } : {}),
+      ...(entry.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
     };
   });
 }
@@ -305,10 +309,14 @@ export function connectedModelChoices(
     const enabled = (credential.enabledModelIds ?? []).map((id) => id.trim()).filter(Boolean);
     const next: ConnectedModelChoice[] =
       enabled.length > 0
-        ? enabled.map((id) => ({
-            ...freeFormChoice(credential, id),
-            images: providerModels.find((entry) => entry.id === id)?.images,
-          }))
+        ? enabled.map((id) => {
+            const known = providerModels.find((entry) => entry.id === id);
+            return {
+              ...freeFormChoice(credential, id),
+              images: known?.images,
+              ...(known?.contextWindow !== undefined ? { contextWindow: known.contextWindow } : {}),
+            };
+          })
         : raw && !resolvedInCatalog
           ? [freeFormChoice(credential, resolved || raw)]
           : catalogChoices(providerModels);
@@ -348,6 +356,8 @@ export type ChatModelChoice = {
   images?: boolean;
   /** `new` for a recent release; `older` folds under Older models. */
   listing?: "new" | "older";
+  /** Context window in tokens when the catalog reports it; the picker warns when it is small. */
+  contextWindow?: number;
 };
 
 /** Filter on full labels before shortening rows; saved/default choices stay first. */
