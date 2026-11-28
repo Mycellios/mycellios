@@ -9,7 +9,8 @@ import { guestChatAccessSql, guestChatSchemaSql } from "../../src/economy/guest-
 export async function createGuestChatSchema(sql: Sql, schema: string, role: string) {
   await sql.unsafe(`CREATE SCHEMA ${schema}`);
   const source = readFileSync(new URL("../../src/storage/database.ts", import.meta.url), "utf8");
-  for (const table of ["economic_contribution_evidence", "economic_accounts", "pricing_policies", "economic_settlements",
+  // API admission reads jobs to ignore reservations whose job already ended.
+  for (const table of ["workers", "jobs", "economic_contribution_evidence", "economic_accounts", "pricing_policies", "economic_settlements",
     "economic_ledger_entries", "economic_settlement_receipts", "node_ownership", "economic_node_reputation", "api_accounts", "api_keys", "api_usage"]) {
     const ddl = source.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n      \\);`))?.[0];
     if (!ddl) throw new Error("Missing canonical DDL: " + table);
