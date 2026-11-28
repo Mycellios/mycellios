@@ -136,7 +136,20 @@ async function snapshot(sql: ReturnType<EmbeddedPostgres["getPgClient"]>): Promi
        FROM pg_trigger t JOIN pg_class r ON r.oid = t.tgrelid JOIN pg_namespace n ON n.oid = r.relnamespace
       WHERE NOT t.tgisinternal AND ${userSchemas}`,
   );
+  const policies = await sql.query<{ table: string; name: string; definition: string }>(
+    `SELECT p.schemaname || '.' || p.tablename AS table, p.policyname AS name,
+            concat_ws(' | ', p.permissive, p.cmd, array_to_string(p.roles, ','), p.qual, p.with_check) AS definition
+       FROM pg_policies p`,
+  );
+  const rowSecurity = await sql.query<{ table: string; mode: "enabled" | "forced" }>(
+    `SELECT n.nspname || '.' || r.relname AS table, m.mode
+       FROM pg_class r JOIN pg_namespace n ON n.oid = r.relnamespace
+       CROSS JOIN LATERAL (VALUES ('enabled', r.relrowsecurity), ('forced', r.relforcerowsecurity)) AS m(mode, on_)
+      WHERE r.relkind IN ('r', 'p') AND m.on_ AND ${userSchemas}`,
+  );
   return {
+    policies: policies.rows,
+    rowSecurity: rowSecurity.rows,
     constraints: constraints.rows,
     uniqueIndexes: uniqueIndexes.rows,
     triggers: triggers.rows,

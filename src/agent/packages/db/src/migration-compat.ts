@@ -27,6 +27,10 @@ export type SchemaShape = {
   constraints?: (TableObject & { kind: string })[];
   uniqueIndexes?: TableObject[];
   triggers?: TableObject[];
+  /** Row-level security policies; `definition` joins command, roles and expressions. */
+  policies?: (TableObject & { definition: string })[];
+  /** Tables with row-level security enabled (`enabled`) or forced on the owner too (`forced`). */
+  rowSecurity?: { table: string; mode: "enabled" | "forced" }[];
 };
 
 export type CompatViolationKind =
@@ -39,6 +43,8 @@ export type CompatViolationKind =
   | "constraint_added"
   | "unique_index_added"
   | "trigger_added"
+  | "policy_changed"
+  | "row_security_enabled"
   | "data_rewrite";
 
 export type CompatViolation = { kind: CompatViolationKind; object: string; detail: string };
@@ -62,6 +68,8 @@ const CONTRACT_ALLOWED: ReadonlySet<CompatViolationKind> = new Set([
   "constraint_added",
   "unique_index_added",
   "trigger_added",
+  "policy_changed",
+  "row_security_enabled",
   "data_rewrite",
 ]);
 
@@ -136,6 +144,23 @@ export function schemaBreaksPreviousRelease(base: SchemaShape, head: SchemaShape
     violations.push({ kind: "unique_index_added", object: `${item.table}.${item.name}`, detail: "may reject the previous release's writes" });
   for (const item of added(base.triggers, head.triggers))
     violations.push({ kind: "trigger_added", object: `${item.table}.${item.name}`, detail: "runs on the previous release's writes" });
+  // Any added, removed or rewritten policy on an existing table changes what the previous
+  // release can read or write.
+  const policyKey = (item: TableObject) => `${item.table}.${item.name}`;
+  const basePolicies = new Map((base.policies ?? []).map((item) => [policyKey(item), item]));
+  const headPolicies = new Map((head.policies ?? []).map((item) => [policyKey(item), item]));
+  for (const name of [...new Set([...basePolicies.keys(), ...headPolicies.keys()])].sort()) {
+    const before = basePolicies.get(name);
+    const after = headPolicies.get(name);
+    if (!baseTables.has((before ?? after)!.table) || before?.definition === after?.definition) continue;
+    const change = !before ? "added" : !after ? "removed" : "rewritten";
+    violations.push({ kind: "policy_changed", object: name, detail: `${change}; may cut the previous release's reads or writes` });
+  }
+  const secured = new Set((base.rowSecurity ?? []).map((item) => `${item.table}:${item.mode}`));
+  for (const item of [...(head.rowSecurity ?? [])].sort((a, b) => `${a.table}:${a.mode}`.localeCompare(`${b.table}:${b.mode}`))) {
+    if (baseTables.has(item.table) && !secured.has(`${item.table}:${item.mode}`))
+      violations.push({ kind: "row_security_enabled", object: item.table, detail: `row-level security now ${item.mode}; the previous release may lose rows` });
+  }
   return violations;
 }
 
