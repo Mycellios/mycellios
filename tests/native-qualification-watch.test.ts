@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvedNativeTargets, nativeTargetsNeedingRefresh, reserveNativeQualificationAttempt, settleNativeQualificationAttempt } from "../src/coordinator/native-qualification-watch.js";
+import { approvedNativeTargets, nativeTargetsNeedingRefresh, reserveNativeQualificationAttempt, settleNativeQualificationAttempt, NATIVE_QUALIFICATION_DAILY_ATTEMPTS } from "../src/coordinator/native-qualification-watch.js";
 import { MEMORY_EMBEDDING_DIGEST, MEMORY_EMBEDDING_MODEL } from "../src/contracts/memory-embedding.js";
 const digest = `sha256:${"a".repeat(64)}`;
 function fixture() {
@@ -10,24 +10,32 @@ function fixture() {
   return { allowlist: { targets: [t] }, workers: [w], t, w };
 }
 describe("native qualification refresh approval", () => {
+  it("retries soon after a first failure and backs off to at most 30 minutes", () => {
+    let state = reserveNativeQualificationAttempt(undefined, 0)!;
+    expect(state.next).toBe(2 * 60_000);
+    expect(reserveNativeQualificationAttempt(state, 60_000)).toBeNull();
+    const gaps: number[] = [];
+    for (let i = 0; i < 6; i++) { const at = state.next; state = reserveNativeQualificationAttempt(state, at)!; gaps.push((state.next - at) / 60_000); }
+    expect(gaps).toEqual([4, 8, 16, 30, 30, 30]);
+  });
   it("retains the daily limit and uncertain-request backoff after a persisted journal is reloaded", () => {
     let state = reserveNativeQualificationAttempt(undefined, 1_000)!;
     expect(reserveNativeQualificationAttempt(state, 2_000)).toBeNull();
-    state = reserveNativeQualificationAttempt(state, 901_000)!;
-    state = reserveNativeQualificationAttempt(state, 1_801_000)!;
+    while (state.count < NATIVE_QUALIFICATION_DAILY_ATTEMPTS) state = reserveNativeQualificationAttempt(state, state.next)!;
+    expect(state.next - state.since).toBeLessThan(86_400_000);
     const reloaded = JSON.parse(JSON.stringify(state));
-    expect(reserveNativeQualificationAttempt(reloaded, 2_701_000)).toBeNull();
+    expect(reserveNativeQualificationAttempt(reloaded, reloaded.next)).toBeNull();
     expect(reserveNativeQualificationAttempt(reloaded, 86_402_000)?.count).toBe(1);
   });
   it("clears the cap after a confirmed qualification but keeps it for failed and uncertain attempts", () => {
     let state = reserveNativeQualificationAttempt(undefined, 1_000)!;
-    for (const now of [901_000, 1_801_000]) state = reserveNativeQualificationAttempt(state, now)!;
+    for (let i = 0; i < 2; i++) state = reserveNativeQualificationAttempt(state, state.next)!;
     expect(state.count).toBe(3);
     for (const status of [422, 502, null]) expect(settleNativeQualificationAttempt(state, status)).toEqual(state);
     // Every coordinator restart drops the proof; a confirmed refresh leaves the next one available.
     const cleared = settleNativeQualificationAttempt(state, 200);
     expect(cleared).toBeUndefined();
-    expect(reserveNativeQualificationAttempt(cleared, 2_701_000)?.count).toBe(1);
+    expect(reserveNativeQualificationAttempt(cleared, 9_000_000)?.count).toBe(1);
   });
   it("refreshes an approved idle physical replica after its session lost evidence", () => {
     const f = fixture(); expect(nativeTargetsNeedingRefresh(f.allowlist, f.workers, 1000)).toEqual([f.t]);

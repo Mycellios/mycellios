@@ -539,7 +539,7 @@ These rules apply to the complete repository.
   `tests/agent-account-links.test.ts`, `tests/landing-marketing-routes.test.ts` and
   `tests/api-access.test.ts`.
 - Native requalification may refresh only explicitly approved worker/build/model/
-  activation/node tuples. Keep the three-attempt daily cap and uncertain-request
+  activation/node tuples. Retry failures permissively (24 a rolling day, 2 min doubling to 30 min) with uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.
   The only model-bound exception is the memory embedding policy: pinned model and
   artifact literals, one owner account, explicit build sources and measured
