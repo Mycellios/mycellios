@@ -298,7 +298,7 @@ describe("free AntSeed offers", () => {
     expect(() => adapter.quote(free as never)).toThrow("managed_model_unavailable");
   });
 
-  it("spreads conversations over every verified free route and keeps each conversation on its route", () => {
+  it("sends every conversation to the strongest verified free route and moves down when it leaves", () => {
     let now = 0; const probes = new FreeOfferProbes(() => now);
     const route = (id: string, reference: number, latencyMs: number) => {
       const key = id + "@svc"; probes.record(key, true, latencyMs);
@@ -309,20 +309,24 @@ describe("free AntSeed offers", () => {
     const pool = freeRoutePool([route("a", 3, 900), route("b", 1, 1_200), route("c", 2, 5_000), slow, failed], probes);
     expect(pool.map(r => r.public.id)).toEqual(["a", "c", "b"]); // strongest first; slow and failed stay out
     const opening = (n: number) => ({ messages: [{ role: "system", content: "Mico" }, { role: "user", content: "Conversation " + n }] });
+    // Every conversation, at every turn, uses the strongest route.
     const used = new Set(Array.from({ length: 30 }, (_, n) => pickFreeRoute(pool, opening(n))!.public.id));
-    expect([...used].sort()).toEqual(["a", "b", "c"]);
+    expect([...used]).toEqual(["a"]);
     const later = { messages: [...opening(4).messages, { role: "assistant", content: "Hi" }, { role: "user", content: "More" }] };
-    expect(pickFreeRoute(pool, later)).toBe(pickFreeRoute(pool, opening(4)));
-    // When a route leaves the pool its conversations move to the remaining ones.
-    expect(pool.slice(1)).toContain(pickFreeRoute(pool.slice(1), opening(4)));
-    // Only the conversations of a route that leaves move; a joining route takes some and moves no others.
-    const before = Array.from({ length: 60 }, (_, n) => pickFreeRoute(pool, opening(n))!.public.id);
-    const smaller = pool.filter(r => r.public.id !== "b");
-    Array.from({ length: 60 }, (_, n) => pickFreeRoute(smaller, opening(n))!.public.id)
-      .forEach((id, n) => { if (before[n] !== "b") expect(id).toBe(before[n]); });
-    const larger = [...pool, route("d", 1, 900)];
-    Array.from({ length: 60 }, (_, n) => pickFreeRoute(larger, opening(n))!.public.id)
-      .forEach((id, n) => { if (id !== "d") expect(id).toBe(before[n]); });
+    expect(pickFreeRoute(pool, later)!.public.id).toBe("a");
+    // When the strongest leaves (refused or exhausted), requests move down the stack in order.
+    expect(pickFreeRoute(pool.slice(1), opening(4))!.public.id).toBe("c");
+    expect(pickFreeRoute(pool.slice(2), opening(4))!.public.id).toBe("b");
+    // A stronger route joining the pool takes over.
+    expect(pickFreeRoute(freeRoutePool([...pool, route("d", 5, 900)], probes), opening(4))!.public.id).toBe("d");
+    expect(pickFreeRoute([], opening(1))).toBeUndefined();
+  });
+
+  it("ranks unprobed stand-ins by their published capability", () => {
+    const probes = new FreeOfferProbes(() => 0);
+    const route = (id: string, reference: number) =>
+      ({ free: true, signals: { key: id + "@svc", eligible: true, reference, allowance: 0, reputation: 50 }, public: { id } as ManagedModel });
+    expect(freeRoutePool([route("weak", 1), route("strong", 4), route("mid", 2)], probes).map(r => r.public.id)).toEqual(["strong", "mid", "weak"]);
   });
 
   it("reads older buyers that only list the combined catalog", async () => {

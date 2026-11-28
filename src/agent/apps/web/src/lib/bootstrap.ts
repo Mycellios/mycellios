@@ -4,6 +4,7 @@ import { ATTACHMENT_MAX_BYTES, attachmentMaxBytes } from "@mycellios/contracts";
 import { displayIdentityResult } from "@mycellios/core";
 import { appRoute } from "./app-path";
 import { initialBootstrapTarget } from "./bootstrap-target";
+import { guestModeActive } from "./guest-mode";
 import { identityLabels } from "./identity-display";
 import { markOnce } from "./performance";
 import { rpc, selectedSpaceId } from "./rpc";
@@ -50,11 +51,15 @@ if (initialTarget) {
 
 /** The speculative first-load bootstrap, left in place for the shell to take. */
 export function peekInitialBootstrap(): Promise<AppBootstrap> | undefined {
+  if (guestModeActive()) return undefined;
   // Only the speculative first load may be shared with the subscription gate.
   return primedBootstrap?.spaceId === undefined ? primedBootstrap?.promise : undefined;
 }
 
 function primedFor(botId: string | undefined) {
+  // The speculative request went to the Agent API before anyone knew the visitor was a guest; the
+  // guest shell reads its own data layer instead, so a guest never takes it.
+  if (guestModeActive()) return null;
   const primed = primedBootstrap;
   return primed &&
     primed.botId === botId &&

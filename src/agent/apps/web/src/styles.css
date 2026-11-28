@@ -496,3 +496,10 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   color: var(--muted-foreground);
   text-decoration-style: dashed;
 }
+
+/* Guest mode (specs/guest-chat/spec.md): features that need an account stay visible, dimmed,
+   and open the account offer. lib/guest-lock.ts decides; this only mirrors it. */
+[data-guest-shell] :is(button, a[href], [role=button], [role=menuitem], [role=tab], [role=switch], [role=combobox], input, select):not([data-guest-allowed], [data-guest-allowed] *, .rk-chat-markdown *),
+[data-guest-shell] [data-guest-allowed] :is([data-guest-locked], [data-guest-locked] *):is(button, a[href], [role=button], [role=menuitem], [role=tab], [role=switch], [role=combobox], input, select) {
+  opacity: 0.4;
+}

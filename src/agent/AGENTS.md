@@ -181,12 +181,19 @@
   welcome page on the bare `/` route, and the sign-in redirect on the bare `/app` route
   (hosted `/agent` redirects there), of an ordinary browser tab when the coordinator's
   `/mobile/v1/guest/config` reports it enabled; deep links, Desktop, the Android host,
-  native WebViews and installed PWAs keep sign-in. `GuestEntry`/`GuestChat` never mount
-  Shell, RPC, realtime or push. Text only: no files, tools, model picker or saved
-  history; the transcript stays in sessionStorage and the nonce in localStorage. Render
-  replies without images (`withoutImages`), with remote images and favicon lookups off.
-  The Dev proxy forwards only the guest cookie on guest paths. Verify guest-chat lib,
-  GuestChat and event-demo-proxy tests and `npx tsx scripts/verify-guest-chat-ui.ts`.
+  native WebViews and installed PWAs keep sign-in. `GuestEntry` shows the ordinary Shell
+  in guest mode (`/app` and `/app/<mico>`): `lib/rpc.ts` sends every call to the
+  browser-local `lib/guest-rpc.ts`, never the Agent API, and a speculative startup
+  bootstrap is never taken. Account features stay visible but locked by `lib/guest-lock.ts`
+  (locked unless `data-guest-allowed`; new controls are locked by default) and open the
+  account offer. Text only: one Mico, no files, tools, model picker or saved history; the
+  whole transcript stays in sessionStorage and travels with each turn, the nonce in
+  localStorage. Render replies without images (`withoutImages`), favicon lookups off.
+  A turn never hangs: resume a pending message with its key, one quiet same-key retry,
+  30 s heartbeat silence ends in a retryable error kept in the thread snapshot. The Dev
+  proxy forwards only the guest cookie on guest paths. Verify guest-chat, guest-rpc,
+  guest-lock, GuestEntry, App and event-demo-proxy tests and
+  `npx tsx scripts/verify-guest-chat-ui.ts`.
 
 - `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
   gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev

@@ -117,53 +117,80 @@ async function main() {
       page.on("pageerror", error => errors.push(error.message));
       const failed: string[] = [];
       page.on("response", response => { if (response.status() >= 400) failed.push(response.status() + " " + new URL(response.url()).pathname); });
-      await page.goto(webOrigin + "/");
-      await page.locator("[data-guest-chat]").waitFor({ timeout: 60_000 }).catch(async error => {
-        if (output) { mkdirSync(output, { recursive: true }); await page.screenshot({ path: join(output, `guest-${name}-failure.png`) }); }
-        console.error(JSON.stringify({ url: page.url(), failed, errors, text: (await page.locator("body").innerText()).slice(0, 600) }));
-        throw error;
+      // The guest shell never calls the Agent API: no RPC, no account routes.
+      // The one exception is the speculative bootstrap every page load at /app sends before anyone
+      // knows the visitor is a guest: it carries no guest data, is refused without a session and the
+      // guest shell never takes it.
+      const agentCalls: string[] = [], speculative: number[] = [];
+      page.on("request", request => {
+        const path = new URL(request.url()).pathname;
+        if (path === "/rpc/bootstrap") return;
+        if (path.startsWith("/rpc") || (path.startsWith("/api/") && !["/api/auth/get-session", "/api/auth/capabilities", "/api/monitoring/config"].includes(path)))
+          agentCalls.push(path);
       });
-      const notice = await page.locator("[data-guest-notice]").innerText();
-      assert.match(notice, locale === "es" ? /No compartas información sensible/ : /Do not share sensitive information/);
-      if (output) { mkdirSync(output, { recursive: true }); await page.screenshot({ path: join(output, `guest-${name}-empty.png`) }); }
+      page.on("response", response => { if (new URL(response.url()).pathname === "/rpc/bootstrap") speculative.push(response.status()); });
+      const shot = async (step: string) => { if (output) { mkdirSync(output, { recursive: true }); await page.screenshot({ path: join(output, `guest-${name}-${step}.png`) }); } };
+      const fail = (step: string) => async (error: unknown) => {
+        await shot(step + "-failure");
+        console.error(JSON.stringify({ step, url: page.url(), failed, errors, agentCalls, text: (await page.locator("body").innerText()).slice(0, 1200) }));
+        throw error;
+      };
+      await page.goto(webOrigin + "/");
+      // The ordinary Agent shell, in guest mode, on its one Mico.
+      await page.locator("[data-guest-shell] [data-guest-notice]").waitFor({ timeout: 60_000 }).catch(fail("entry"));
+      assert.match(new URL(page.url()).pathname, /\/app\/guest-mico$/);
+      assert.match(await page.locator("[data-guest-notice]").innerText(), locale === "es" ? /No compartas información sensible/ : /Do not share sensitive information/);
+      assert.equal(await page.locator("[data-guest-starters] button").count(), 4);
+      await shot("empty");
 
-      const composer = page.locator("textarea");
-      for (let turn = 1; turn <= 3; turn++) {
-        await composer.fill(`Question ${turn}: what is Mycellios?`);
-        if (name === "mobile") await page.locator('form button[type="submit"]').tap();
+      // A feature that needs an account is visible but locked, and offers the account.
+      await page.locator("[data-guest-shell] fieldset button:not([data-guest-allowed]):visible").first().click();
+      await page.locator("[data-guest-account-prompt]").waitFor().catch(fail("locked"));
+      await shot("locked");
+      await page.keyboard.press("Escape");
+      await page.locator("[data-guest-account-prompt]").waitFor({ state: "hidden" });
+
+      const composer = page.locator("textarea[data-guest-allowed]");
+      const send = async (text: string) => {
+        await composer.fill(text);
+        if (name === "mobile") await page.locator("[data-guest-shell] fieldset button[data-guest-allowed]:visible").last().tap();
         else await composer.press("Enter");
-        await page.locator('[data-role="assistant"]:not([aria-busy])').nth(turn - 1).filter({ hasText: "distributed network" })
-          .waitFor({ timeout: 30_000 }).catch(async error => {
-            if (output) await page.screenshot({ path: join(output, `guest-${name}-turn-failure.png`) });
-            console.error(JSON.stringify({ turn, failed, errors, text: (await page.locator("main").innerText()).slice(0, 1200) }));
-            throw error;
-          });
+      };
+      for (let turn = 1; turn <= 3; turn++) {
+        await send(`Question ${turn}: what is Mycellios?`);
+        await page.locator(`[data-testid="message-bot-bubble"]:has-text("distributed network") >> nth=${turn - 1}`).waitFor({ timeout: 30_000 }).catch(fail("turn-" + turn));
+        await page.locator("[data-testid=\"mico-resting\"]").waitFor({ timeout: 10_000 }).catch(fail("resting-" + turn));
         if (turn === 1) {
           const cookies = await context.cookies(webOrigin + "/mobile/v1/guest/chat");
           const guest = cookies.find(cookie => cookie.name === "mycellios-guest-local");
           assert.ok(guest, "guest cookie set");
           assert.equal(guest.path, "/mobile/v1/guest"); assert.equal(guest.httpOnly, true); assert.equal(guest.sameSite, "Strict");
           assert.equal((await context.cookies(webOrigin + "/")).some(cookie => cookie.name.includes("guest")), false);
-          if (output) await page.screenshot({ path: join(output, `guest-${name}-answer.png`) });
+          await shot("answer");
           // A reload in the same tab keeps the transcript.
           await page.reload();
-          await page.locator("[data-guest-chat]").waitFor();
-          assert.equal(await page.locator("[data-role]").count(), 2);
+          await page.locator("[data-guest-shell] [data-guest-notice]").waitFor();
+          await page.locator("[data-testid=\"message-bot-bubble\"]").first().waitFor();
+          assert.equal(await page.locator("[data-testid=\"message-user-bubble\"]").count(), 1);
+          assert.equal(await page.locator("[data-testid=\"message-bot-bubble\"]").count(), 1);
         }
       }
-      await page.locator('[data-guest-alert="guest_session_limit_reached"]').waitFor();
-      assert.equal(await composer.isDisabled(), true);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       assert.ok(overflow <= 0, `no horizontal page scroll (${overflow})`);
-      if (output) await page.screenshot({ path: join(output, `guest-${name}-limit.png`) });
-      await page.locator('[data-guest-alert="guest_session_limit_reached"] button').first().click();
+      // The free messages are used up: the next one offers the account instead of running.
+      await send("One more question");
+      await page.locator("[data-guest-account-prompt]").waitFor().catch(fail("limit"));
+      await shot("limit");
+      await page.locator("[data-guest-account-prompt] button", { hasText: locale === "es" ? "Crear una cuenta gratis" : "Create a free account" }).click();
       await page.waitForURL(/\/sign-up$/);
-      // A deep link keeps the ordinary sign-in flow instead of guest chat.
+      // A deep link keeps the ordinary sign-in flow instead of guest mode.
       await page.goto(webOrigin + "/?task=test-only");
       await page.waitForTimeout(1500);
-      assert.equal(await page.locator("[data-guest-chat]").count(), 0);
+      assert.equal(await page.locator("[data-guest-shell]").count(), 0);
       assert.deepEqual(errors, []);
-      results[name] = { turns: 3, cookie: "scoped", reload: "kept", limit: "account offered", deepLink: "sign-in flow" };
+      assert.deepEqual(agentCalls, []);
+      assert.ok(speculative.every(status => status >= 400), `speculative bootstrap refused without a session (${speculative})`);
+      results[name] = { turns: 3, cookie: "scoped", reload: "kept", locked: "account offered", limit: "account offered", deepLink: "sign-in flow", agentApi: "never called" };
       await context.close();
     }
     // Installed web apps keep requiring sign-in.
@@ -176,11 +203,11 @@ async function main() {
     });
     await page.goto(webOrigin + "/");
     await page.waitForTimeout(3000);
-    assert.equal(await page.locator("[data-guest-chat]").count(), 0);
+    assert.equal(await page.locator("[data-guest-shell]").count(), 0);
     results.standalone = "sign-in flow";
     await standalone.close();
     assert.equal(requests.length, 6);
-    assert.ok(requests.every(options => JSON.stringify(options) === JSON.stringify({ freeRefusalRetries: 0 })));
+    assert.ok(requests.every(options => options === undefined));
     const stored = JSON.stringify(await db.raw.prepare("SELECT * FROM guest_chat_sessions").all());
     assert.ok(!stored.includes("Mycellios") && !stored.includes("Question"), "no content stored");
     console.log(JSON.stringify({ passed: true, ...results, inferences: requests.length, paidSuppliers: 0 }));

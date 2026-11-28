@@ -45,7 +45,8 @@ import { IntegrationCallbackPage } from "./pages/IntegrationCallback";
 import { IntegrationSetupPage } from "./pages/IntegrationSetup";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { ShellPage } from "./pages/Shell";
-import { GuestEntry } from "./pages/guest/GuestEntry";
+import { GuestEntry, guestShellPath } from "./pages/guest/GuestEntry";
+import { leaveGuestMode } from "./lib/guest-mode";
 import { eventDemoRoute } from "./lib/event-demo";
 
 const EventDemoPage = lazyComponent(() => import("./pages/demo/EventDemo").then(module => module.EventDemoPage));
@@ -161,6 +162,11 @@ function SessionApp() {
       .catch(() => undefined);
     return () => { current = false; };
   }, [analyticsUserId, screen, productAnalytics, analyticsAccountId]);
+  // Guest mode lasts only inside the guest shell (and the entry that leads to it).
+  const signedInUser = session.data?.user;
+  useLayoutEffect(() => {
+    if (signedInUser || (pathname !== "/" && !guestShellPath(pathname))) leaveGuestMode();
+  }, [signedInUser, pathname]);
   const gate = sessionGate(session);
   useEffect(() => {
     if (gate === "authenticated" || gate === "anonymous") setQueryUser(analyticsUserId ?? null);
@@ -196,7 +202,7 @@ function SessionApp() {
       <div className="h-full" data-rakazo-app-state="ready">
         <Suspense fallback={<PageLoading />}>
           <Routes>
-            <Route path="/" element={user ? <Navigate to="/app" replace /> : <GuestEntry fallback={<WelcomePage />} />} />
+            <Route path="/" element={user ? <Navigate to="/app" replace /> : <GuestEntry fallback={<WelcomePage />}><Navigate to="/app" replace /></GuestEntry>} />
             <Route
               path="/sign-in"
               element={
@@ -237,10 +243,12 @@ function SessionApp() {
                   <SubscriptionGate fallback={<PageLoading />}>
                     <Outlet />
                   </SubscriptionGate>
-                ) : pathname === "/app" ? (
-                  // Hosted Agent sends its bare entry (/agent) to /app: a signed-out visitor
-                  // there may chat as a guest; GuestEntry falls back to sign-in otherwise.
-                  <GuestEntry fallback={<Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />} />
+                ) : guestShellPath(pathname) ? (
+                  // Hosted Agent sends its bare entry (/agent) to /app: a signed-out visitor there
+                  // sees the shell in guest mode; GuestEntry falls back to sign-in otherwise.
+                  <GuestEntry fallback={<Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />}>
+                    <Outlet />
+                  </GuestEntry>
                 ) : (
                   <Navigate to={signInNext ? `/sign-in?next=${signInNext}` : "/sign-in"} replace />
                 )

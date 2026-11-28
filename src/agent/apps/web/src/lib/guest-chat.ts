@@ -19,6 +19,8 @@ export class GuestChatRequestError extends Error {
 }
 
 const BASE = "/mobile/v1/guest";
+/** Three missed coordinator heartbeats. */
+export const GUEST_IDLE_MS = 30_000;
 const NONCE_KEY = "mycellios:guest:nonce";
 const CHAT_KEY = "mycellios:guest:chat";
 let memoryNonce: string | undefined;
@@ -132,10 +134,31 @@ export const guestApi = {
     }
     throw new GuestChatRequestError("guest_session_expired");
   },
-  async chat(input: GuestPending, onText: (text: string) => void, signal: AbortSignal): Promise<GuestResult> {
+  async chat(input: GuestPending, onText: (text: string) => void, signal: AbortSignal, idleMs = GUEST_IDLE_MS): Promise<GuestResult> {
+    // The coordinator writes a heartbeat every 10 s while the answer is prepared; silence longer than
+    // idleMs means the connection is gone, and the turn ends with a retryable error instead of hanging.
+    const idle = new AbortController();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const touch = () => { clearTimeout(timer); timer = setTimeout(() => { timedOut = true; idle.abort(); }, idleMs); };
+    // AbortSignal.any is missing in browsers before Safari 17.4; link the two by hand.
+    const onAbort = () => idle.abort();
+    if (signal.aborted) idle.abort(); else signal.addEventListener("abort", onAbort, { once: true });
+    const linked = idle.signal;
+    touch();
+    try {
+      return await this.stream(input, onText, linked, touch);
+    } catch (error) {
+      if (timedOut && !signal.aborted) throw new GuestChatRequestError("guest_answer_timeout");
+      if (!signal.aborted && !(error instanceof GuestChatRequestError)) throw new GuestChatRequestError("guest_connection_lost");
+      throw error;
+    } finally { clearTimeout(timer); signal.removeEventListener("abort", onAbort); }
+  },
+  async stream(input: GuestPending, onText: (text: string) => void, signal: AbortSignal, touch: () => void): Promise<GuestResult> {
     const response = await fetch(BASE + "/chat", { method: "POST", credentials: "same-origin", cache: "no-store",
       redirect: "error", signal, headers: { "content-type": "application/json", accept: "text/event-stream" },
       body: JSON.stringify(input) });
+    touch();
     if (!response.ok) {
       const value = await response.json().catch(() => null) as { error?: { code?: string } } | null;
       if (value?.error?.code === "guest_session_expired") forgetNonce();
@@ -147,6 +170,7 @@ export const guestApi = {
     try {
       while (true) {
         const chunk = await reader.read(); if (chunk.done) break;
+        touch();
         bytes += chunk.value.length; if (bytes > 1_048_576) throw new GuestChatRequestError("guest_temporarily_unavailable");
         buffer += decoder.decode(chunk.value, { stream: true });
         let index: number;
@@ -187,3 +211,6 @@ export const guestCache = {
     catch { /* The live conversation keeps working. */ }
   },
 };
+
+// Dev only: guest state lives in this module, so an edit reloads the page instead of keeping two copies.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());

@@ -434,6 +434,7 @@ export function SidebarRoster({
                 const chatTrigger = (
                   <ContextMenuTrigger
                     render={<button type="button" />}
+                    data-guest-allowed
                     draggable={item.kind === "bot" && sidebarChatOrder === "manual"}
                     data-mico-avatar-hover=""
                     data-roster-bot-id={item.kind === "bot" ? item.chat.id : undefined}

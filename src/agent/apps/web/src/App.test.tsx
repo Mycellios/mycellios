@@ -57,7 +57,10 @@ vi.mock("./pages/Board", () => {
   capability.boardLoaded();
   return { BoardPage: () => <div>Board page</div> };
 });
-vi.mock("./pages/guest/GuestEntry", () => ({ GuestEntry: () => <div>Guest entry</div> }));
+vi.mock("./pages/guest/GuestEntry", () => ({
+  GuestEntry: () => <div>Guest entry</div>,
+  guestShellPath: (pathname: string) => /^\/app(\/[^/]+)?\/?$/.test(pathname) && !/^\/app\/(artifacts|board|g)\/?$/.test(pathname),
+}));
 vi.mock("./pages/IntegrationSetup", () => ({ IntegrationSetupPage: () => null }));
 vi.mock("./pages/McpOAuthCallback", () => ({ McpOAuthCallbackPage: () => null }));
 
@@ -143,7 +146,10 @@ it("offers guest entry on the bare /app a hosted /agent redirects to, never on d
     expect(container.textContent).toBe("Guest entry");
     await render("/");
     expect(container.textContent).toBe("Guest entry");
+    // The guest shell covers its one Mico; other Agent pages keep sign-in.
     await render("/app/bot-1");
+    expect(container.textContent).toBe("Guest entry");
+    await render("/app/artifacts");
     expect(container.textContent).toBe("Auth in");
     capability.session = signedIn;
     await render("/app");

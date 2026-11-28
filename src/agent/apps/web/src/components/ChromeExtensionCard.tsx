@@ -55,7 +55,7 @@ export function ChromeExtensionCard({ mico }: { mico?: { id: string; color: stri
     setDismissed(true);
     try { window.localStorage.setItem(DISMISSED_KEY, "true"); } catch { /* Closed for this visit only. */ }
   };
-  return <section className="rk-chrome-card" aria-labelledby="rk-chrome-card-title">
+  return <section className="rk-chrome-card" data-guest-allowed aria-labelledby="rk-chrome-card-title">
     <button type="button" className="rk-chrome-card-close" aria-label={t`Close the Chrome extension notice`} onClick={dismiss}>
       <X size={14} aria-hidden="true" />
     </button>

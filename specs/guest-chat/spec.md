@@ -190,8 +190,9 @@ free allowance of registered users (`DEFAULT_FREE_DAILY_REQUESTS`).
 
 1. **Coordinator.** Config, owner SQL, admission challenge, session and chat routes,
    limits and free-route reuse. Disabled by default.
-2. **Agent web.** `GuestChat` surface, entry routing, notices, limit and busy states,
-   Dev proxy cookie forwarding.
+2. **Agent web.** The ordinary shell in guest mode over the browser guest data layer,
+   locked account features, entry routing, notices, limit and busy states, Dev proxy
+   cookie forwarding.
 3. **Conversion.** After verified registration in the same tab, an explicit "Keep
    this conversation" imports the bounded `sessionStorage` transcript into a new
    side conversation of the person's first Mico through an authenticated,
@@ -215,11 +216,12 @@ free allowance of registered users (`DEFAULT_FREE_DAILY_REQUESTS`).
 - Isolated PostgreSQL: concurrent session creation from one prefix, concurrent turns
   at the global cap, UTC day rollover, idempotent nonce reuse and the counters
   staying consistent under rollback.
-- Managed provider tests with fictional zero-priced sellers: guest refusal, seller
-  rest, no reserve promotion and registered accounts unaffected.
+- Managed provider tests with fictional zero-priced sellers: strongest-first routing,
+  moving down when a route leaves, seller rest and reserve promotion.
 - Agent web tests: entry routing (bare route versus deep links, signed-in, native,
-  standalone), no `Shell` or RPC mount, markdown hardening, `sessionStorage`
-  failure, limit and busy states.
+  standalone), the guest data layer never calling the Agent API, locked controls and
+  shortcuts, resume and retry, markdown hardening, `sessionStorage` failure, limit and
+  busy states.
 - A real browser fixture at desktop and mobile sizes against a loopback coordinator
   with fictional free sellers: first message, limit reached, reload in the same tab,
   sign-in handoff. No production accounts, credentials or paid suppliers in fixtures.

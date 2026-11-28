@@ -103,7 +103,7 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   kind: "privacy",
   title: "Mycellios Privacy Policy",
-  updated: "27 November 2026",
+  updated: "28 November 2026",
   intro:
     "This policy explains what personal data Mycellios processes, why, who receives it and the choices you have. It covers the website, the Agent workspace, the Chrome extension, the Desktop and Android apps, the API and the compute network.",
   sections: [
@@ -138,7 +138,7 @@ export const PRIVACY: LegalDocument = {
       "In Account settings you can review which data your agents share with AI providers.",
     ] },
     { id: "guest-chat", heading: "Guest chat without an account", paragraphs: [
-      "When guest chat is available, you can talk to a Mico in a browser tab without creating an account. Each message, together with the recent conversation, is sent to the free AI model that answers it. That model is served by third-party providers and by computers on the Mycellios network, so do not share sensitive information in guest chat.",
+      "When guest chat is available, you can talk to a Mico in a browser tab without creating an account. Each message, together with the conversation so far, is sent to the free AI model that answers it. That model is served by third-party providers and by computers on the Mycellios network, so do not share sensitive information in guest chat.",
       "We do not store the content of guest conversations on our servers. The conversation is kept only in that browser tab and is gone when you close it. To prevent abuse, a cookie keeps your guest session, and we keep message counts and a keyed digest of your network address range (never your full IP address). We delete them 7 days after the session ends.",
     ] },
     { id: "sharing", heading: "Who receives data", paragraphs: ["We share data only as needed to provide Mycellios, with:"], list: [
